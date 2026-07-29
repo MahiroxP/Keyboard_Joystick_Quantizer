@@ -310,6 +310,7 @@ LDFLAGS += -Wl,--wrap=puts
 LDFLAGS += -Wl,--wrap=putchar
 LDFLAGS += -Wl,--wrap=getchar
 LDFLAGS += -Wl,--print-memory-usage
+LDFLAGS += -Wl,--allow-multiple-definition
 
 SRC += $(PICO_SDK_PATH)/src/rp2_common/pico_stdlib/stdlib.c
 SRC += $(PICO_SDK_PATH)/src/rp2_common/hardware_adc/adc.c

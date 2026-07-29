@@ -10,6 +10,20 @@
 #define PICO_SYSTEM_CLOCK_KHZ 120000
 #define PICO_PIO_USB_HOST_ENABLE
 
+/* Analog joystick used as an additional pointing device (no button) */
+#define ANALOG_JOYSTICK_ENABLE
+#define ANALOG_JOYSTICK_X_PIN 26
+#define ANALOG_JOYSTICK_Y_PIN 27
+#define ANALOG_JOYSTICK_ADC_CENTER 512
+#define ANALOG_JOYSTICK_ADC_DEADZONE 60
+#define ANALOG_JOYSTICK_ADC_DIVISOR 640
+// How much slower than the tuned max speed movement starts at when the
+// stick first leaves the deadzone (higher = slower start).
+#define ANALOG_JOYSTICK_ACCEL_START_SCALE 240
+// How long (ms) the stick needs to stay tilted before reaching the tuned
+// max speed above.
+#define ANALOG_JOYSTICK_ACCEL_RAMP_MS 4000
+
 /* key matrix size */
 #define MATRIX_ROWS 24
 #define MATRIX_COLS 8

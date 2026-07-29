@@ -36,10 +36,12 @@
 #include "hardware/resets.h"
 #include "hardware/watchdog.h"
 #include "hardware/exception.h"
+#include "hardware/adc.h"
 #include "pico/multicore.h"
 #include "cdc_device.h"
 #include "tusb.h"
 #include "pio_usb.h"
+#include "pointing_device.h"
 
 #include "RP2040.h"
 #include "core_cm0plus.h"
@@ -200,9 +202,123 @@ void eeconfig_init_kb(void) {
     eeconfig_init_user();
 }
 
+#ifdef ANALOG_JOYSTICK_ENABLE
+static void analog_joystick_init(void) {
+    adc_init();
+    adc_gpio_init(ANALOG_JOYSTICK_X_PIN);
+    adc_gpio_init(ANALOG_JOYSTICK_Y_PIN);
+}
+
+// RP2040's ADC is 12bit, but this joystick is specified against a 10bit ADC
+// (center=512), so the raw reading is rescaled down to that 10bit range.
+//
+// The quadratic term is scaled up by SUBPIXEL_SCALE and any sub-1 remainder
+// is carried over to the next call (via *carry), so slow overall speeds
+// don't get lost to integer truncation of the mid-range of stick travel.
+#define ANALOG_JOYSTICK_SUBPIXEL_SCALE 256
+
+static int32_t analog_joystick_read_raw(uint8_t pin) {
+    adc_select_input(pin - 26);
+    return (int32_t)(adc_read() >> 2) - ANALOG_JOYSTICK_ADC_CENTER;
+}
+
+// Quadratic response (fine control near center, disproportionately faster
+// the further the stick is tilted), further multiplied by accel_scale (the
+// hold-time ramp computed in analog_joystick_task).
+static int32_t analog_joystick_magnitude(int32_t deflection, float accel_scale) {
+    int32_t max_value = ANALOG_JOYSTICK_ADC_CENTER - ANALOG_JOYSTICK_ADC_DEADZONE;
+    if (deflection > max_value) {
+        deflection = max_value;
+    }
+
+    int32_t subpixels = (deflection * deflection * ANALOG_JOYSTICK_SUBPIXEL_SCALE) / max_value;
+    return (int32_t)(subpixels * accel_scale);
+}
+
+static int8_t analog_joystick_step(int32_t magnitude, int32_t sign, int32_t *carry) {
+    *carry += sign * magnitude;
+
+    int32_t unit = ANALOG_JOYSTICK_ADC_DIVISOR * ANALOG_JOYSTICK_SUBPIXEL_SCALE;
+    int32_t step = *carry / unit;
+    *carry -= step * unit;
+
+    if (step > 127) {
+        step = 127;
+    } else if (step < -127) {
+        step = -127;
+    }
+
+    return (int8_t)step;
+}
+
+static void analog_joystick_task(void) {
+    static int32_t  x_carry       = 0;
+    static int32_t  y_carry       = 0;
+    static uint16_t hold_start_ms = 0;
+    static bool     holding       = false;
+
+    int32_t raw_x = analog_joystick_read_raw(ANALOG_JOYSTICK_X_PIN);
+    int32_t raw_y = analog_joystick_read_raw(ANALOG_JOYSTICK_Y_PIN);
+
+    int32_t sign_x = raw_x < 0 ? -1 : 1;
+    int32_t sign_y = raw_y < 0 ? -1 : 1;
+    int32_t dev_x  = raw_x < 0 ? -raw_x : raw_x;
+    int32_t dev_y  = raw_y < 0 ? -raw_y : raw_y;
+
+    bool active = (dev_x >= ANALOG_JOYSTICK_ADC_DEADZONE) || (dev_y >= ANALOG_JOYSTICK_ADC_DEADZONE);
+
+    if (active) {
+        if (!holding) {
+            holding       = true;
+            hold_start_ms = timer_read();
+        }
+    } else {
+        holding = false;
+    }
+
+    // Ramp up from a slow start (fine movements) the longer the stick stays
+    // tilted, reaching the previously-tuned max speed only after being held
+    // for ANALOG_JOYSTICK_ACCEL_RAMP_MS.
+    const float min_scale = 1.0f / ANALOG_JOYSTICK_ACCEL_START_SCALE;
+    float       accel_scale = min_scale;
+    if (holding) {
+        uint16_t held_ms = timer_elapsed(hold_start_ms);
+        if (held_ms >= ANALOG_JOYSTICK_ACCEL_RAMP_MS) {
+            accel_scale = 1.0f;
+        } else {
+            float progress = (float)held_ms / ANALOG_JOYSTICK_ACCEL_RAMP_MS;
+            accel_scale     = min_scale + progress * (1.0f - min_scale);
+        }
+    }
+
+    int8_t dx = 0;
+    int8_t dy = 0;
+    if (dev_x >= ANALOG_JOYSTICK_ADC_DEADZONE) {
+        int32_t magnitude = analog_joystick_magnitude(dev_x - ANALOG_JOYSTICK_ADC_DEADZONE, accel_scale);
+        dx                = analog_joystick_step(magnitude, sign_x, &x_carry);
+    }
+    if (dev_y >= ANALOG_JOYSTICK_ADC_DEADZONE) {
+        int32_t magnitude = analog_joystick_magnitude(dev_y - ANALOG_JOYSTICK_ADC_DEADZONE, accel_scale);
+        dy                = analog_joystick_step(magnitude, sign_y, &y_carry);
+    }
+
+    if (dx != 0 || dy != 0) {
+        report_mouse_t mouse = pointing_device_get_report();
+        mouse.x += dx;
+        mouse.y += -dy;  // invert vertical axis
+        pointing_device_set_report(mouse);
+        pointing_device_send();
+    }
+}
+#endif
+
 void matrix_init_kb(void) {
     keyboard_config.raw = eeconfig_read_kb();
     set_key_override(keyboard_config.override_mode);
+
+#ifdef ANALOG_JOYSTICK_ENABLE
+    analog_joystick_init();
+#endif
 
     matrix_init_user();
 }
@@ -226,6 +342,10 @@ void matrix_scan_kb(void) {
             __NVIC_SystemReset();
         }
     }
+
+#ifdef ANALOG_JOYSTICK_ENABLE
+    analog_joystick_task();
+#endif
 
     matrix_scan_user();
 }

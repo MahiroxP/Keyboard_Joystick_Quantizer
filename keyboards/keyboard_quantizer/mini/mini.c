@@ -203,23 +203,35 @@ void eeconfig_init_kb(void) {
 }
 
 #ifdef ANALOG_JOYSTICK_ENABLE
+// Logical center for each axis, calibrated from the resting position at
+// power-on (see analog_joystick_init) since the physical joystick's true
+// center can drift from the nominal ANALOG_JOYSTICK_ADC_CENTER.
+static int32_t joystick_center_x = ANALOG_JOYSTICK_ADC_CENTER;
+static int32_t joystick_center_y = ANALOG_JOYSTICK_ADC_CENTER;
+
+// RP2040's ADC is 12bit, but this joystick is specified against a 10bit ADC
+// (center=512), so the raw reading is rescaled down to that 10bit range.
+static int32_t analog_joystick_read_10bit(uint8_t pin) {
+    adc_select_input(pin - 26);
+    return (int32_t)(adc_read() >> 2);
+}
+
 static void analog_joystick_init(void) {
     adc_init();
     adc_gpio_init(ANALOG_JOYSTICK_X_PIN);
     adc_gpio_init(ANALOG_JOYSTICK_Y_PIN);
+
+    joystick_center_x = analog_joystick_read_10bit(ANALOG_JOYSTICK_X_PIN);
+    joystick_center_y = analog_joystick_read_10bit(ANALOG_JOYSTICK_Y_PIN);
 }
 
-// RP2040's ADC is 12bit, but this joystick is specified against a 10bit ADC
-// (center=512), so the raw reading is rescaled down to that 10bit range.
-//
 // The quadratic term is scaled up by SUBPIXEL_SCALE and any sub-1 remainder
 // is carried over to the next call (via *carry), so slow overall speeds
 // don't get lost to integer truncation of the mid-range of stick travel.
 #define ANALOG_JOYSTICK_SUBPIXEL_SCALE 256
 
-static int32_t analog_joystick_read_raw(uint8_t pin) {
-    adc_select_input(pin - 26);
-    return (int32_t)(adc_read() >> 2) - ANALOG_JOYSTICK_ADC_CENTER;
+static int32_t analog_joystick_read_raw(uint8_t pin, int32_t center) {
+    return analog_joystick_read_10bit(pin) - center;
 }
 
 // Quadratic response (fine control near center, disproportionately faster
@@ -252,13 +264,41 @@ static int8_t analog_joystick_step(int32_t magnitude, int32_t sign, int32_t *car
 }
 
 static void analog_joystick_task(void) {
-    static int32_t  x_carry       = 0;
-    static int32_t  y_carry       = 0;
-    static uint16_t hold_start_ms = 0;
-    static bool     holding       = false;
+    static int32_t  x_carry        = 0;
+    static int32_t  y_carry        = 0;
+    static uint16_t hold_start_ms  = 0;
+    static bool     holding        = false;
+    static int32_t  still_ref_x    = 0;
+    static int32_t  still_ref_y    = 0;
+    static uint16_t still_start_ms = 0;
+    static bool     still_tracking = false;
 
-    int32_t raw_x = analog_joystick_read_raw(ANALOG_JOYSTICK_X_PIN);
-    int32_t raw_y = analog_joystick_read_raw(ANALOG_JOYSTICK_Y_PIN);
+    int32_t raw_x = analog_joystick_read_raw(ANALOG_JOYSTICK_X_PIN, joystick_center_x);
+    int32_t raw_y = analog_joystick_read_raw(ANALOG_JOYSTICK_Y_PIN, joystick_center_y);
+
+    // Re-center whenever the tilt has held steady (within tolerance) for
+    // ANALOG_JOYSTICK_RECENTER_MS, treating that position as the new
+    // "stopped" state.
+    int32_t still_diff_x = raw_x - still_ref_x;
+    int32_t still_diff_y = raw_y - still_ref_y;
+    if (still_diff_x < 0) still_diff_x = -still_diff_x;
+    if (still_diff_y < 0) still_diff_y = -still_diff_y;
+
+    if (!still_tracking || still_diff_x > ANALOG_JOYSTICK_RECENTER_TOLERANCE ||
+        still_diff_y > ANALOG_JOYSTICK_RECENTER_TOLERANCE) {
+        still_tracking = true;
+        still_ref_x    = raw_x;
+        still_ref_y    = raw_y;
+        still_start_ms = timer_read();
+    } else if (timer_elapsed(still_start_ms) >= ANALOG_JOYSTICK_RECENTER_MS) {
+        joystick_center_x += raw_x;
+        joystick_center_y += raw_y;
+        raw_x          = 0;
+        raw_y          = 0;
+        still_ref_x    = 0;
+        still_ref_y    = 0;
+        still_tracking = false;
+    }
 
     int32_t sign_x = raw_x < 0 ? -1 : 1;
     int32_t sign_y = raw_y < 0 ? -1 : 1;

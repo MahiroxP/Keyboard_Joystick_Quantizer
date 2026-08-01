@@ -15,8 +15,15 @@
 #define ANALOG_JOYSTICK_X_PIN 26
 #define ANALOG_JOYSTICK_Y_PIN 27
 #define ANALOG_JOYSTICK_ADC_CENTER 512
-#define ANALOG_JOYSTICK_ADC_DEADZONE 60
+#define ANALOG_JOYSTICK_ADC_DEADZONE 90
 #define ANALOG_JOYSTICK_ADC_DIVISOR 640
+// If the stick reports the same tilt continuously for this long, that tilt
+// is treated as the new "stopped" position (re-centers to compensate for
+// the physical resting point drifting over time).
+#define ANALOG_JOYSTICK_RECENTER_MS 4000
+// ADC counts of wiggle room when judging whether the tilt is "the same",
+// to tolerate ADC noise.
+#define ANALOG_JOYSTICK_RECENTER_TOLERANCE 3
 // How much slower than the tuned max speed movement starts at when the
 // stick first leaves the deadzone (higher = slower start).
 #define ANALOG_JOYSTICK_ACCEL_START_SCALE 240

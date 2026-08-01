@@ -1,2 +1,0 @@
-
-SRC += analog.c

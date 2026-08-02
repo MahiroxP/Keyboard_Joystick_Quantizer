@@ -33,7 +33,11 @@ PRINT_ERROR_PLAIN = ($(SILENT) ||printf " $(ERROR_STRING)" | $(AWK_STATUS)) && $
 PRINT_WARNING_PLAIN = ($(SILENT) || printf " $(WARN_STRING)" | $(AWK_STATUS)) && $(TAB_LOG_PLAIN)
 PRINT_SKIPPED_PLAIN = ($(SILENT) || printf " $(SKIPPED_STRING)" | $(AWK_STATUS))
 PRINT_OK = $(SILENT) || printf " $(OK_STRING)" | $(AWK_STATUS)
-BUILD_CMD = LOG=$$($(CMD) 2>&1) ; if [ $$? -gt 0 ]; then $(PRINT_ERROR); elif [ "$$LOG" != "" ] ; then $(PRINT_WARNING); else $(PRINT_OK); fi;
+PRINT_OK_WITH_LOG = ($(SILENT) || printf " $(OK_STRING)" | $(AWK_STATUS)) && $(TAB_LOG)
+# Non-empty output (e.g. the linker's --print-memory-usage report) isn't
+# itself a warning, so only the [WARNINGS] label is checked against actual
+# "warning" text in the captured output rather than mere non-emptiness.
+BUILD_CMD = LOG=$$($(CMD) 2>&1) ; if [ $$? -gt 0 ]; then $(PRINT_ERROR); elif printf "%s" "$$LOG" | grep -qi warning; then $(PRINT_WARNING); elif [ "$$LOG" != "" ] ; then $(PRINT_OK_WITH_LOG); else $(PRINT_OK); fi;
 MAKE_MSG_FORMAT = $(AWK) '{ printf "%-118s", $$0;}'
 
 # The UNSYNC_OUTPUT_CMD command disables the `--output-sync` for the current command, if the `--output-sync` granularity is `target` or lower.

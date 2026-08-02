@@ -12,6 +12,15 @@ BIN = $(OBJCOPY) -O binary
 ALLOW_WARNINGS := yes
 OPT_DEFS += -DPROTOCOL_PICO
 OPT_DEFS += -DSPLIT_USB_DETECT
+
+# tmk_core/rules.mk's generic `%.uf2: %.hex` pattern rule (which builds
+# $(BUILD_DIR)/$(TARGET).uf2, the file QMK actually treats as the build
+# output) falls back to UF2_FAMILY's default of 0x0 unless a platform sets
+# it, silently producing a UF2 with no/zero family ID. The RP2040 bootrom
+# then accepts the copy but never commits it as valid firmware, so the
+# board never resets after flashing. quantum/mcu_selection.mk has no
+# RP2040 case, so it must be set here.
+UF2_FAMILY = 0xe48bff56
 PICOTOOL ?= picotool
 RP2BOOT_ID ?= "2e8a:0003"
 LSUSB ?= lsusb
@@ -83,6 +92,7 @@ CFLAGS += -I$(PICO_SDK_PATH)/src/common/pico_stdlib/include
 CFLAGS += -I$(PICO_SDK_PATH)/src/rp2_common/hardware_flash/include
 CFLAGS += -I$(PICO_SDK_PATH)/src/rp2_common/hardware_gpio/include
 CFLAGS += -I$(PICO_SDK_PATH)/src/common/pico_base/include
+CFLAGS += -Idrivers/pico_board_override
 CFLAGS += -I$(PICO_SDK_PATH)/src/boards/include
 CFLAGS += -I$(PICO_SDK_PATH)/src/rp2_common/pico_platform/include
 CFLAGS += -I$(PICO_SDK_PATH)/src/rp2040/hardware_regs/include
@@ -392,7 +402,7 @@ BOOT2INC_DIR += -I$(PICO_SDK_PATH)/src/rp2_common/boot_stage2/asminclude
 
 $(KEYBOARD_OUTPUT)/src/bs2_default.o: $(PICO_SDK_PATH)/src/rp2_common/boot_stage2/compile_time_choice.S $(KEYBOARD_OUTPUT)/cflags.txt
 	@mkdir -p $(KEYBOARD_OUTPUT)/src
-	$(CC) $(CFLAGS) $(BOOT2INC_DIR) -c -o $@ $^
+	$(CC) $(CFLAGS) $(BOOT2INC_DIR) -c -o $@ $<
 
 $(KEYBOARD_OUTPUT)/src/bs2_default.elf: $(KEYBOARD_OUTPUT)/src/bs2_default.o
 	$(CC) $(CFLAGS) -Wl,--build-id=none -nostartfiles -Wl,--script=$(PICO_SDK_PATH)/src/rp2_common/boot_stage2/boot_stage2.ld $^ -o $@

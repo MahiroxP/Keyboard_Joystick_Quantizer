@@ -223,11 +223,11 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
                     break;
                 }
                 case id_switch_matrix_state: {
-                    uint8_t i = 1;
-                    uint8_t row_limit = 28 / ((MATRIX_COLS + 7) / 8);
-                    row_limit = row_limit > MATRIX_ROWS ? MATRIX_ROWS : row_limit;
-                    for (uint8_t row = 0; row < row_limit; row++) {
-                        matrix_row_t value = matrix_get_row(row);
+                    uint8_t offset = command_data[1];
+                    uint8_t rows   = 28 / ((MATRIX_COLS + 7) / 8);
+                    uint8_t i      = 2;
+                    for (uint8_t row = 0; row < rows && row + offset < MATRIX_ROWS; row++) {
+                        matrix_row_t value = matrix_get_row(row + offset);
 #    if (MATRIX_COLS > 24)
                         command_data[i++] = (value >> 24) & 0xFF;
 #    endif

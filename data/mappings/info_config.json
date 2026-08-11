@@ -43,7 +43,7 @@
     "PERMISSIVE_HOLD_PER_KEY": {"info_key": "tapping.permissive_hold_per_key", "value_type": "bool"},
     "RETRO_TAPPING": {"info_key": "tapping.retro", "value_type": "bool"},
     "RETRO_TAPPING_PER_KEY": {"info_key": "tapping.retro_per_key", "value_type": "bool"},
-    "RGB_DI_PIN": {"info_key": "rgblight.pin"},
+    "RGB_DI_PIN": {"info_key": "rgblight.pin", "value_type": "int"},
     "RGBLED_NUM": {"info_key": "rgblight.led_count", "value_type": "int"},
     "RGBLED_SPLIT": {"info_key": "rgblight.split_count", "value_type": "array.int"},
     "RGBLIGHT_ANIMATIONS": {"info_key": "rgblight.animations.all", "value_type": "bool"},

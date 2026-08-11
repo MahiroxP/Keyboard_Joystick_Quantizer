@@ -30,6 +30,9 @@
 // How long (ms) the stick needs to stay tilted before reaching the tuned
 // max speed above.
 #define ANALOG_JOYSTICK_ACCEL_RAMP_MS 4000
+// Compensates for the joystick's physical mounting angle by rotating its
+// output. Degrees, clockwise, must be a multiple of 45 in [0, 315].
+#define ANALOG_JOYSTICK_LAYOUT 0
 
 /* key matrix size */
 #define MATRIX_ROWS 24
@@ -48,8 +51,10 @@
 #define QUANTIZER_REPORT_PARSER REPORT_PARSER_DEFAULT
 
 #define RGBLIGHT_SPLIT
-#define G00 255 // Dummy for bin/qmk config generation
-#define RGB_DI_PIN G00
+#define RGB_DI_PIN 16  // onboard WS2812 LED (Waveshare RP2040-Zero), driven
+                       // directly via ws2812_setleds() for debug input
+                       // indication -- RGBLIGHT_ENABLE stays off, so the
+                       // animation settings below are unused scaffolding
 #ifdef RGB_DI_PIN
 #    define RGBLED_NUM_DEFAULT 128
 #    define RGBLIGHT_HUE_STEP 8

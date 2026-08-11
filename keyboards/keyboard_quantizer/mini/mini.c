@@ -43,6 +43,7 @@
 #include "tusb.h"
 #include "pio_usb.h"
 #include "pointing_device.h"
+#include "ws2812.h"
 
 #include "RP2040.h"
 #include "core_cm0plus.h"
@@ -203,6 +204,8 @@ void eeconfig_init_kb(void) {
     eeconfig_init_user();
 }
 
+static void debug_led_flash(void);
+
 #ifdef ANALOG_JOYSTICK_ENABLE
 // Logical center for each axis, calibrated from the resting position at
 // power-on (see analog_joystick_init) since the physical joystick's true
@@ -264,6 +267,24 @@ static int8_t analog_joystick_step(int32_t magnitude, int32_t sign, int32_t *car
     return (int8_t)step;
 }
 
+// Rotates a raw (x, y) deflection by ANALOG_JOYSTICK_LAYOUT degrees
+// (clockwise, multiple of 45) to compensate for the joystick's physical
+// mounting angle. cos/sin are fixed-point (*256); 181/256 = 0.70703125
+// approximates 1/sqrt(2), exact enough for integer ADC deflection.
+static void analog_joystick_rotate(int32_t *x, int32_t *y) {
+    static const int32_t cos256[8] = {256, 181, 0, -181, -256, -181, 0, 181};
+    static const int32_t sin256[8] = {0, 181, 256, 181, 0, -181, -256, -181};
+
+    uint8_t idx = (uint8_t)((ANALOG_JOYSTICK_LAYOUT / 45) % 8);
+    int32_t c   = cos256[idx];
+    int32_t s   = sin256[idx];
+    int32_t rx  = *x;
+    int32_t ry  = *y;
+
+    *x = (rx * c - ry * s) >> 8;
+    *y = (rx * s + ry * c) >> 8;
+}
+
 static void analog_joystick_task(void) {
     static int32_t  x_carry        = 0;
     static int32_t  y_carry        = 0;
@@ -300,6 +321,11 @@ static void analog_joystick_task(void) {
         still_ref_y    = 0;
         still_tracking = false;
     }
+
+    // Recentering above must stay in the physical ADC coordinate space, so
+    // the mounting-angle rotation is applied after it, only affecting the
+    // direction reported for cursor movement below.
+    analog_joystick_rotate(&raw_x, &raw_y);
 
     int32_t sign_x = raw_x < 0 ? -1 : 1;
     int32_t sign_y = raw_y < 0 ? -1 : 1;
@@ -349,9 +375,66 @@ static void analog_joystick_task(void) {
         mouse.y += -dy;  // invert vertical axis
         pointing_device_set_report(mouse);
         pointing_device_send();
+
+        debug_led_flash();
     }
 }
 #endif
+
+// Onboard WS2812 LED flashed briefly on any keyboard input or joystick
+// movement, for visually confirming that input is being registered. Each
+// flash steps to the next hue so consecutive flashes cycle through the
+// rainbow. Driven directly (not via the RGBLIGHT_ENABLE feature, so no
+// dependency on quantum/color.c's hsv_to_rgb) since this is just a debug
+// indicator, not a lighting effect.
+#define DEBUG_LED_FLASH_MS 80
+#define DEBUG_LED_VAL 32
+#define DEBUG_LED_HUE_STEP 16  // 256 / 16 = 16 distinct hues per revolution
+
+static uint16_t debug_led_timer  = 0;
+static bool     debug_led_active = false;
+static uint8_t  debug_led_hue    = 0;
+
+// Minimal full-saturation HSV->RGB (region-based hue wheel), avoiding a
+// dependency on quantum/color.c (which isn't otherwise built here).
+static LED_TYPE debug_led_hue_to_rgb(uint8_t hue, uint8_t val) {
+    uint8_t region    = hue / 43;        // 0..5 (256/6 ~= 43)
+    uint8_t remainder  = (hue % 43) * 6;  // 0..255
+    uint8_t q          = (uint8_t)(((uint16_t)val * (255 - remainder)) >> 8);
+    uint8_t t          = (uint8_t)(((uint16_t)val * remainder) >> 8);
+
+    switch (region) {
+        case 0:
+            return (LED_TYPE){.r = val, .g = t, .b = 0};
+        case 1:
+            return (LED_TYPE){.r = q, .g = val, .b = 0};
+        case 2:
+            return (LED_TYPE){.r = 0, .g = val, .b = t};
+        case 3:
+            return (LED_TYPE){.r = 0, .g = q, .b = val};
+        case 4:
+            return (LED_TYPE){.r = t, .g = 0, .b = val};
+        default:
+            return (LED_TYPE){.r = val, .g = 0, .b = q};
+    }
+}
+
+static void debug_led_flash(void) {
+    LED_TYPE led = debug_led_hue_to_rgb(debug_led_hue, DEBUG_LED_VAL);
+    debug_led_hue += DEBUG_LED_HUE_STEP;
+
+    ws2812_setleds(&led, 1);
+    debug_led_timer  = timer_read();
+    debug_led_active = true;
+}
+
+static void debug_led_task(void) {
+    if (debug_led_active && timer_elapsed(debug_led_timer) >= DEBUG_LED_FLASH_MS) {
+        LED_TYPE led = {0};
+        ws2812_setleds(&led, 1);
+        debug_led_active = false;
+    }
+}
 
 void matrix_init_kb(void) {
     keyboard_config.raw = eeconfig_read_kb();
@@ -388,10 +471,16 @@ void matrix_scan_kb(void) {
     analog_joystick_task();
 #endif
 
+    debug_led_task();
+
     matrix_scan_user();
 }
 
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
+    if (record->event.pressed) {
+        debug_led_flash();
+    }
+
     if (encoder_modifier != 0 && !is_encoder_action) {
         unregister_mods(encoder_modifier);
         encoder_modifier = 0;

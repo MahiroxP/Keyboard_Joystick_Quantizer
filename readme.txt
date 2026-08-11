@@ -8,7 +8,9 @@ keyboard_quantizer/mini (quantizer_mini branch)
 このリポジトリは、RP2040(Waveshare RP2040-Zero等)を「keyboard quantizer」
 として動作させるためのQMKファームウェアです。RP2040自身がPIO(プログラマ
 ブルI/O)を使ってUSBホスト機能をソフトウェアで実装し、専用のUSBホスト
-コントローラICなしに、接続したキーボードの入力をPCへ中継します。
+コントローラICなしに、接続したキーボードの入力をPCへ中継します。あわせて、
+RP2040のADCに接続したアナログジョイスティックをマウスカーソル移動用の
+ポインティングデバイスとして使えるようにする機能も備えています。
 
 ■ このビルドの主な機能
 ・USBキーボードの中継(quantizer本体): 接続したキーボードのHID入力を
@@ -46,7 +48,14 @@ keyboard_quantizer/mini (quantizer_mini branch)
 Claude Code(Anthropic製のAIコーディングエージェント)によって作成された
 ものであり、リポジトリ所有者(MahiroxP)本人が直接記述したものでは
 ありません。上記著作権表示はリポジトリ所有者としての表示であり、実際の
-記述作業はAIエージェントが行いました。
+記述作業はAIエージェントが行いました。Claude Codeを用いた開発は、個人的な
+使用を前提とした試験目的で行ったものです。
+
+■ 動作確認済みのジョイスティック
+以下のアナログジョイスティックで動作確認済みです。
+・Adafruit 2765 (Mini 2-Axis Analog Thumbstick)
+・ALPS ALPINE RKJXV122400R
+・ALPS ALPINE RKJXY1000006
 
 ------------------------------------------------------------------------
 
@@ -57,7 +66,9 @@ This repository is a QMK firmware build that turns an RP2040 (e.g. a
 Waveshare RP2040-Zero) into a "keyboard quantizer." The RP2040 itself
 implements USB host functionality in software via its PIO (Programmable
 I/O) blocks, relaying input from a connected keyboard to the PC without
-a dedicated USB host controller chip.
+a dedicated USB host controller chip. It also lets an analog joystick
+wired to the RP2040's ADC act as a pointing device for mouse cursor
+movement.
 
 Main features of this build
 - USB keyboard relay (the core quantizer function): decodes HID input
@@ -100,4 +111,12 @@ A note on authorship
 All code changes and comments added on this fork were written by Claude
 Code (an AI coding agent by Anthropic), not directly by the repository
 owner (MahiroxP). The copyright notice above reflects ownership of the
-repository; the actual writing was carried out by the AI agent.
+repository; the actual writing was carried out by the AI agent. This use
+of Claude Code was for personal, testing purposes only.
+
+Joysticks verified to work
+This build has been tested and confirmed working with the following
+analog joysticks:
+- Adafruit 2765 (Mini 2-Axis Analog Thumbstick)
+- ALPS ALPINE RKJXV122400R
+- ALPS ALPINE RKJXY1000006

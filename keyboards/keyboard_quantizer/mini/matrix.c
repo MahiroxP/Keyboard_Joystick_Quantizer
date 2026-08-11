@@ -10,7 +10,7 @@
 // etc.) can treat it like a normal keyboard.
 
 #include QMK_KEYBOARD_H
-#include "mini.h"
+#include "main.h"
 
 #include <string.h>
 

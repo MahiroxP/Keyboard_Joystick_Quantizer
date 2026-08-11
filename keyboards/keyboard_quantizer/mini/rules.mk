@@ -1,7 +1,19 @@
-# Custom-matrix source (see matrix.c: TinyUSB host callbacks + report
-# parsing dispatch) and the debug status LED driver (see mini.c).
-# カスタムマトリクスのソース(matrix.c: TinyUSBホストのコールバックと
-# レポート解析の振り分け)と、デバッグ用ステータスLEDのドライバ(mini.c参照)。
+# Overrides QMK's default output filename (KEYBOARD_FILESAFE_KEYMAP, i.e.
+# keyboard_quantizer_mini_default) with this project's name.
+# QMKのデフォルト出力ファイル名(KEYBOARD_FILESAFE_KEYMAP、つまり
+# keyboard_quantizer_mini_default)をこのプロジェクトの名前で上書きする。
+TARGET = Keyboard_Joystick_Quantizer
+
+# main.c is no longer auto-detected by QMK's build system, since that
+# detection matches files named after the keyboard folder ("mini.c"); add
+# it explicitly. Also the custom-matrix source (see matrix.c: TinyUSB host
+# callbacks + report parsing dispatch) and the debug status LED driver
+# (see main.c).
+# main.cはQMKのビルドシステムによる自動検出(キーボードのフォルダ名と同名の
+# ファイル="mini.c"にマッチする仕組み)が効かなくなったため、明示的に追加。
+# また、カスタムマトリクスのソース(matrix.c: TinyUSBホストのコールバックと
+# レポート解析の振り分け)と、デバッグ用ステータスLEDのドライバ(main.c参照)。
+SRC += main.c
 SRC += matrix.c
 SRC += drivers/pico/ws2812.c
 # drivers/pico/ws2812.c includes "atomic_util.h" by bare filename; this
@@ -45,10 +57,10 @@ CUSTOM_MATRIX = lite
 VIA_ENABLE = yes
 # Enables QMK's pointing-device (mouse) report subsystem, used both to
 # forward reports from a connected USB mouse and to send the analog
-# joystick's synthesized mouse movement (see mini.c).
+# joystick's synthesized mouse movement (see main.c).
 # QMKのポインティングデバイス(マウス)レポート機構を有効化する。接続された
 # USBマウスのレポート転送と、アナログジョイスティックが生成するマウス移動
-# (mini.c参照)の両方で使われる。
+# (main.c参照)の両方で使われる。
 POINTING_DEVICE_ENABLE = yes
 
 # Shared host-OS auto-detection (used for the JP/US key override feature)

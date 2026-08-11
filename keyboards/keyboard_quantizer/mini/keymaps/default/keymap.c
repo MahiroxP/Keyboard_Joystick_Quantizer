@@ -19,7 +19,7 @@
 #include "pointing_device.h"
 #include "debug.h"
 
-#include "mini.h"
+#include "main.h"
 #include "report_parser.h"
 
 #include "user_config.h"

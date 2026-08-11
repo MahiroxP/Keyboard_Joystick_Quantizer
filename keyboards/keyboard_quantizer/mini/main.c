@@ -16,7 +16,7 @@
  */
 
 #include "keyboard_quantizer.h"
-#include "mini.h"
+#include "main.h"
 #include "report_descriptor_parser.h"
 #include "report_parser.h"
 
@@ -60,8 +60,8 @@ extern uint8_t device_cnt;
 extern uint8_t hid_info_cnt;
 
 // This board's persistent (EEPROM-backed) settings; see keyboard_config_t
-// in mini.h for the individual fields.
-// このボードの永続設定(EEPROM保存)。各項目の説明はmini.hの
+// in main.h for the individual fields.
+// このボードの永続設定(EEPROM保存)。各項目の説明はmain.hの
 // keyboard_config_t参照。
 keyboard_config_t keyboard_config;
 
